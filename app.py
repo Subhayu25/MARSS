@@ -103,7 +103,6 @@ if uploaded_excel:
 
 # --- Apply Filters ----------------------------------------------------------
 
-# Survey filter
 survey_mask = (
     survey_df["Age_Group"].isin(age_sel) &
     survey_df["Gender"].isin(gender_sel) &
@@ -112,7 +111,6 @@ survey_mask = (
 )
 survey_f = survey_df[survey_mask].copy()
 
-# Campaign filter (if available)
 if uploaded_excel:
     camp_mask = (
         camp_df_raw["Channel_Used"].isin(chan_sel) &
@@ -216,8 +214,8 @@ with tabs[2]:
 
     st.subheader("ROI Proxy by Segment")
     roi_seg = survey_f.groupby(seg_dim) \
-        .apply(lambda x: ( (x["Purchase_Last_3mo"] == "Yes").mean() * rev_input
-                           - x["Monthly_Online_Spend"].mean() )
+        .apply(lambda x: ((x["Purchase_Last_3mo"] == "Yes").mean() * rev_input
+                          - x["Monthly_Online_Spend"].mean())
         ).reset_index(name="ROI")
     fig2 = px.bar(
         roi_seg,
@@ -232,31 +230,19 @@ with tabs[2]:
 with tabs[3]:
     st.header("🎯 Predictive Models")
 
-    # Prepare classification data
+    # Classification
     df_clf = survey_f.copy()
     df_clf["Purchase_Last_3mo"] = df_clf["Purchase_Last_3mo"].map({"Yes": 1, "No": 0})
-
-    # Encode categorical features
     le = LabelEncoder()
     for col in df_clf.select_dtypes(include="object"):
         df_clf[col] = le.fit_transform(df_clf[col].astype(str))
-
-    # Separate X and y
     X = df_clf.drop(columns=["Purchase_Last_3mo"])
     y = df_clf["Purchase_Last_3mo"]
-
-    # Clean infinite / NaN for classification
     X = X.replace([np.inf, -np.inf], np.nan)
     mask = X.notnull().all(axis=1)
     X = X.loc[mask]
     y = y.loc[mask]
-
-    # Train/Test split
-    Xtr, Xte, ytr, yte = train_test_split(
-        X, y, test_size=0.3, random_state=42
-    )
-
-    # Logistic Regression
+    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=42)
     logr = LogisticRegression(max_iter=1000).fit(Xtr, ytr)
     ypred = logr.predict(Xte)
     clf_metrics = {
@@ -269,20 +255,17 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
-    # Linear Regression for Spend
+    # Regression
     st.subheader("Linear Regression (Spend)")
     Xl = pd.get_dummies(
         survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
         drop_first=True
     )
     yl = survey_f["Monthly_Online_Spend"]
-
-    # Combine and clean for regression
     df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
     df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
     Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
     yl_clean = df_reg["Monthly_Online_Spend"]
-
     Xltr, Xlte, yltr, ylte = train_test_split(
         Xl_clean, yl_clean, test_size=0.3, random_state=42
     )
@@ -291,7 +274,7 @@ with tabs[3]:
     rmse = np.sqrt(mean_squared_error(ylte, ylpred))
     st.metric("RMSE", f"{rmse:.2f}")
 
-    # K-Means Clustering
+    # Clustering
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
