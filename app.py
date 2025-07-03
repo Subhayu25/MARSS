@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression, Lasso, Ridge
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
@@ -173,46 +174,42 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
+    # --- Regression Models ---
     st.subheader("Regression Models (Spend)")
+    Xl = pd.get_dummies(
+        survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
+        drop_first=True
+    )
+    yl = survey_f["Monthly_Online_Spend"]
+    df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
+    df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
+    Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
+    yl_clean = df_reg["Monthly_Online_Spend"]
+    Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
 
-Xl = pd.get_dummies(
-    survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
-    drop_first=True
-)
-yl = survey_f["Monthly_Online_Spend"]
-df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
-df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
-Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
-yl_clean = df_reg["Monthly_Online_Spend"]
-Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
+    regressors = {
+        "Linear Regression": LinearRegression(),
+        "Lasso Regression": Lasso(alpha=0.01, max_iter=10000),
+        "Ridge Regression": Ridge(alpha=1.0, max_iter=10000),
+        "Decision Tree Regression": DecisionTreeRegressor(max_depth=4, random_state=42)
+    }
 
-# List of regressors to compare
-regressors = {
-    "Linear Regression": LinearRegression(),
-    "Lasso Regression": Lasso(alpha=0.01, max_iter=10000),
-    "Ridge Regression": Ridge(alpha=1.0, max_iter=10000),
-    "Decision Tree Regression": DecisionTreeRegressor(max_depth=4, random_state=42)
-}
+    results = []
+    for name, model in regressors.items():
+        model.fit(Xltr, yltr)
+        y_pred = model.predict(Xlte)
+        mse = mean_squared_error(ylte, y_pred)
+        rmse = np.sqrt(mse)
+        r2 = model.score(Xlte, ylte)
+        results.append({
+            "Model": name,
+            "RMSE": rmse,
+            "R-Squared": r2
+        })
 
-results = []
-for name, model in regressors.items():
-    model.fit(Xltr, yltr)
-    y_pred = model.predict(Xlte)
-    mse = mean_squared_error(ylte, y_pred)
-    rmse = np.sqrt(mse)
-    r2 = model.score(Xlte, ylte)
-    results.append({
-        "Model": name,
-        "RMSE": rmse,
-        "R-Squared": r2
-    })
+    results_df = pd.DataFrame(results)
+    st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R-Squared": "{:.3f}"}))
 
-# Display as a table
-results_df = pd.DataFrame(results)
-st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R-Squared": "{:.3f}"}))
-
-
-    # --- KMeans Clustering (SAFE!) ---
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
@@ -223,7 +220,6 @@ st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R-Squared": "{:.3f}"}))
     fig3 = px.scatter(x=pca[:, 0], y=pca[:, 1], color=km.labels_.astype(str), labels={"x": "PC1", "y": "PC2", "color": "Cluster"})
     st.plotly_chart(fig3, use_container_width=True)
 
-    # Assign cluster labels ONLY to the rows used in clustering!
     clust_df = survey_f.loc[X.index].copy()
     clust_df["Cluster"] = km.labels_
 
@@ -235,6 +231,8 @@ st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R-Squared": "{:.3f}"}))
         "Monthly_Online_Spend": "Avg_Spend"
     })
     st.write(prof)
+
+# ...rest of your code remains unchanged for tabs[4] and tabs[5]
 
 with tabs[4]:
     st.header("🚀 Campaign Analysis")
