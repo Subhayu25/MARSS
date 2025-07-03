@@ -173,7 +173,7 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
-    # Linear Regression (Spend)
+    # --- Linear Regression (Spend) ---
     st.subheader("Linear Regression (Spend)")
     Xl = pd.get_dummies(
         survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
@@ -191,7 +191,7 @@ with tabs[3]:
     rmse = np.sqrt(mse)
     st.metric("RMSE", f"{rmse:.2f}")
 
-    # ---- KMeans with robust Cluster labeling ----
+    # --- KMeans Clustering (SAFE!) ---
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
@@ -202,9 +202,10 @@ with tabs[3]:
     fig3 = px.scatter(x=pca[:, 0], y=pca[:, 1], color=km.labels_.astype(str), labels={"x": "PC1", "y": "PC2", "color": "Cluster"})
     st.plotly_chart(fig3, use_container_width=True)
 
-    # Assign clusters to matching rows ONLY (no length mismatch)
+    # Assign cluster labels ONLY to the rows used in clustering!
     clust_df = survey_f.loc[X.index].copy()
     clust_df["Cluster"] = km.labels_
+
     prof = clust_df.groupby("Cluster").agg({
         "Purchase_Last_3mo": lambda x: (x == "Yes").mean(),
         "Monthly_Online_Spend": "mean"
