@@ -291,12 +291,19 @@ with tabs[5]:
 
     st.subheader("Survey Feature Correlations")
     num_corr = survey_f.select_dtypes(include="number").corr()
-    fig11, ax = plt.subplots(figsize=(6, 5))
-    sns.heatmap(num_corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
-    st.pyplot(fig11)
+    if num_corr.isnull().all().all() or num_corr.shape[0] == 0:
+        st.warning("No numeric data available for correlation heatmap. Try adjusting filters.")
+    else:
+        fig11, ax = plt.subplots(figsize=(6, 5))
+        sns.heatmap(num_corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
+        st.pyplot(fig11)
 
     if camp_f is not None:
         st.subheader("Campaign Metric Correlations")
-        corr2, ax2 = plt.subplots(figsize=(6, 5))
-        sns.heatmap(camp_f[sel_cols].corr(), annot=True, fmt=".2f", cmap="coolwarm", ax=ax2)
-        st.pyplot(corr2)
+        camp_corr = camp_f[sel_cols].corr()
+        if camp_corr.isnull().all().all() or camp_corr.shape[0] == 0:
+            st.warning("No numeric campaign data available for correlation heatmap. Try adjusting campaign filters.")
+        else:
+            corr2, ax2 = plt.subplots(figsize=(6, 5))
+            sns.heatmap(camp_corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax2)
+            st.pyplot(corr2)
