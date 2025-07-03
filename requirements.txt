@@ -1,0 +1,11 @@
+# requirements.txt
+
+streamlit
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+plotly
+mlxtend
+openpyxl
