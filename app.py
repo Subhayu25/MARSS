@@ -245,7 +245,7 @@ with tabs[3]:
     X = df_clf.drop(columns=["Purchase_Last_3mo"])
     y = df_clf["Purchase_Last_3mo"]
 
-    # Clean infinite / NaN
+    # Clean infinite / NaN for classification
     X = X.replace([np.inf, -np.inf], np.nan)
     mask = X.notnull().all(axis=1)
     X = X.loc[mask]
@@ -276,6 +276,13 @@ with tabs[3]:
         drop_first=True
     )
     yl = survey_f["Monthly_Online_Spend"]
+
+    # Clean infinite / NaN for regression
+    Xl = Xl.replace([np.inf, -np.inf], np.nan)
+    maskl = Xl.notnull().all(axis=1)
+    Xl = Xl.loc[maskl]
+    yl = yl.loc[maskl]
+
     Xltr, Xlte, yltr, ylte = train_test_split(
         Xl, yl, test_size=0.3, random_state=42
     )
