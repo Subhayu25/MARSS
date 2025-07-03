@@ -149,8 +149,6 @@ with tabs[2]:
 
 with tabs[3]:
     st.header("🎯 Predictive Models")
-
-    # --- Classification ---
     df_clf = survey_f.copy()
     df_clf["Purchase_Last_3mo"] = df_clf["Purchase_Last_3mo"].map({"Yes": 1, "No": 0})
     le = LabelEncoder()
@@ -175,7 +173,7 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
-    # --- Regression ---
+    # Linear Regression (Spend)
     st.subheader("Linear Regression (Spend)")
     Xl = pd.get_dummies(
         survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
@@ -193,7 +191,6 @@ with tabs[3]:
     rmse = np.sqrt(mse)
     st.metric("RMSE", f"{rmse:.2f}")
 
-    # --- Clustering ---
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
