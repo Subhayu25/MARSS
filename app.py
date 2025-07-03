@@ -173,23 +173,44 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
-    # --- Linear Regression (Spend) ---
-    st.subheader("Linear Regression (Spend)")
-    Xl = pd.get_dummies(
-        survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
-        drop_first=True
-    )
-    yl = survey_f["Monthly_Online_Spend"]
-    df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
-    df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
-    Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
-    yl_clean = df_reg["Monthly_Online_Spend"]
-    Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
-    lr = LinearRegression().fit(Xltr, yltr)
-    ylpred = lr.predict(Xlte)
-    mse = mean_squared_error(ylte, ylpred)
+    st.subheader("Regression Models (Spend)")
+
+Xl = pd.get_dummies(
+    survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
+    drop_first=True
+)
+yl = survey_f["Monthly_Online_Spend"]
+df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
+df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
+Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
+yl_clean = df_reg["Monthly_Online_Spend"]
+Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
+
+# List of regressors to compare
+regressors = {
+    "Linear Regression": LinearRegression(),
+    "Lasso Regression": Lasso(alpha=0.01, max_iter=10000),
+    "Ridge Regression": Ridge(alpha=1.0, max_iter=10000),
+    "Decision Tree Regression": DecisionTreeRegressor(max_depth=4, random_state=42)
+}
+
+results = []
+for name, model in regressors.items():
+    model.fit(Xltr, yltr)
+    y_pred = model.predict(Xlte)
+    mse = mean_squared_error(ylte, y_pred)
     rmse = np.sqrt(mse)
-    st.metric("RMSE", f"{rmse:.2f}")
+    r2 = model.score(Xlte, ylte)
+    results.append({
+        "Model": name,
+        "RMSE": rmse,
+        "R-Squared": r2
+    })
+
+# Display as a table
+results_df = pd.DataFrame(results)
+st.dataframe(results_df.style.format({"RMSE": "{:.2f}", "R-Squared": "{:.3f}"}))
+
 
     # --- KMeans Clustering (SAFE!) ---
     st.subheader("K-Means Clustering")
