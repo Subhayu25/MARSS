@@ -271,7 +271,8 @@ with tabs[3]:
     )
     lr = LinearRegression().fit(Xltr, yltr)
     ylpred = lr.predict(Xlte)
-    rmse = np.sqrt(mean_squared_error(ylte, ylpred))
+    mse = mean_squared_error(ylte, ylpred)
+    rmse = np.sqrt(mse)
     st.metric("RMSE", f"{rmse:.2f}")
 
     # Clustering
