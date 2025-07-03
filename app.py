@@ -18,14 +18,8 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# Sidebar: Uploads & Filters
+# Sidebar: Upload campaign Excel file only
 st.sidebar.title("🔧 Uploads & Filters")
-
-uploaded_csv = st.sidebar.file_uploader(
-    "Upload survey CSV file",
-    type=["csv"],
-    help="Upload your own survey data in CSV format. If not provided, the default dataset is used."
-)
 
 uploaded_excel = st.sidebar.file_uploader(
     "Upload campaign Excel file (xlsx)",
@@ -33,27 +27,23 @@ uploaded_excel = st.sidebar.file_uploader(
     help="Must contain sheet 'marketing_campaign_dataset' with a Date column."
 )
 
+# === EDIT THIS ===
+csv_url = "https://raw.githubusercontent.com/yourusername/yourrepo/main/synthetic_consumer_marketing_survey.csv"
+
 @st.cache_data
-def load_survey(uploaded_csv):
-    if uploaded_csv is not None:
-        try:
-            df = pd.read_csv(uploaded_csv)
-        except Exception as e:
-            st.error(f"Failed to read uploaded CSV: {e}")
-            return pd.DataFrame()
-    else:
-        try:
-            df = pd.read_csv("synthetic_consumer_marketing_survey.csv")
-        except FileNotFoundError:
-            st.error("File 'synthetic_consumer_marketing_survey.csv' not found and no CSV uploaded.")
-            return pd.DataFrame()
+def load_survey():
+    try:
+        df = pd.read_csv(csv_url)
+    except Exception as e:
+        st.error(f"Failed to read CSV from GitHub: {e}")
+        return pd.DataFrame()
     if "Purchase_Last_3mo" not in df.columns:
         st.error("'Purchase_Last_3mo' column missing from CSV.")
         return pd.DataFrame()
     df = df.dropna(subset=["Purchase_Last_3mo"])
     return df
 
-survey_df = load_survey(uploaded_csv)
+survey_df = load_survey()
 
 if survey_df.empty:
     st.stop()
@@ -98,9 +88,7 @@ with col2:
 with col3:
     # Robust purchase rate calculation: handles numeric and string cases
     if "Purchase_Last_3mo" in filtered_df.columns:
-        # Try convert to numeric
         filtered_df['Purchase_Last_3mo_numeric'] = pd.to_numeric(filtered_df['Purchase_Last_3mo'], errors='coerce')
-        # If all are NaN, try map common string values
         if filtered_df['Purchase_Last_3mo_numeric'].isna().all():
             mapping = {'yes': 1, 'no': 0, 'Yes': 1, 'No': 0, 'Y': 1, 'N': 0}
             filtered_df['Purchase_Last_3mo_numeric'] = filtered_df['Purchase_Last_3mo'].map(mapping)
