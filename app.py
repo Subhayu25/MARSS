@@ -24,8 +24,6 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# --- Load Consumer Survey Data ----------------------------------------------
-
 @st.cache_data
 def load_survey():
     df = pd.read_csv("synthetic_consumer_marketing_survey.csv")
@@ -34,46 +32,21 @@ def load_survey():
 
 survey_df = load_survey()
 
-# --- Sidebar: Upload + Filters ----------------------------------------------
-
 st.sidebar.title("🔧 Uploads & Filters")
 
-# 1. Campaign Excel uploader
 uploaded_excel = st.sidebar.file_uploader(
     "Upload campaign Excel file (xlsx)",
     type=["xlsx"],
     help="Must contain sheet 'marketing_campaign_dataset' with a Date column."
 )
 
-# 2. Survey filters
 with st.sidebar.expander("Consumer Survey Filters", expanded=True):
-    age_sel    = st.multiselect(
-        "Age Group",
-        survey_df["Age_Group"].unique(),
-        default=survey_df["Age_Group"].unique()
-    )
-    gender_sel = st.multiselect(
-        "Gender",
-        survey_df["Gender"].unique(),
-        default=survey_df["Gender"].unique()
-    )
-    region_sel = st.multiselect(
-        "Region",
-        survey_df["Region"].unique(),
-        default=survey_df["Region"].unique()
-    )
-    edu_sel    = st.multiselect(
-        "Education",
-        survey_df["Education"].unique(),
-        default=survey_df["Education"].unique()
-    )
-    rev_input  = st.number_input(
-        "Avg Revenue per Purchase",
-        value=100.0,
-        step=10.0
-    )
+    age_sel    = st.multiselect("Age Group", survey_df["Age_Group"].unique(), default=survey_df["Age_Group"].unique())
+    gender_sel = st.multiselect("Gender", survey_df["Gender"].unique(), default=survey_df["Gender"].unique())
+    region_sel = st.multiselect("Region", survey_df["Region"].unique(), default=survey_df["Region"].unique())
+    edu_sel    = st.multiselect("Education", survey_df["Education"].unique(), default=survey_df["Education"].unique())
+    rev_input  = st.number_input("Avg Revenue per Purchase", value=100.0, step=10.0)
 
-# 3. Campaign filters (only if file uploaded)
 if uploaded_excel:
     camp_df_raw = pd.read_excel(
         uploaded_excel,
@@ -82,26 +55,11 @@ if uploaded_excel:
         parse_dates=["Date"]
     )
     with st.sidebar.expander("Campaign Data Filters", expanded=False):
-        chan_sel  = st.multiselect(
-            "Channel",
-            camp_df_raw["Channel_Used"].unique(),
-            default=camp_df_raw["Channel_Used"].unique()
-        )
-        ctype_sel = st.multiselect(
-            "Campaign Type",
-            camp_df_raw["Campaign_Type"].unique(),
-            default=camp_df_raw["Campaign_Type"].unique()
-        )
+        chan_sel  = st.multiselect("Channel", camp_df_raw["Channel_Used"].unique(), default=camp_df_raw["Channel_Used"].unique())
+        ctype_sel = st.multiselect("Campaign Type", camp_df_raw["Campaign_Type"].unique(), default=camp_df_raw["Campaign_Type"].unique())
         dmin = camp_df_raw["Date"].min().date()
         dmax = camp_df_raw["Date"].max().date()
-        date_range = st.date_input(
-            "Date Range",
-            [dmin, dmax],
-            min_value=dmin,
-            max_value=dmax
-        )
-
-# --- Apply Filters ----------------------------------------------------------
+        date_range = st.date_input("Date Range", [dmin, dmax], min_value=dmin, max_value=dmax)
 
 survey_mask = (
     survey_df["Age_Group"].isin(age_sel) &
@@ -122,8 +80,6 @@ if uploaded_excel:
 else:
     camp_f = None
 
-# --- Main Layout ------------------------------------------------------------
-
 tabs = st.tabs([
     "🏠 Overview",
     "🧮 Descriptive",
@@ -132,8 +88,6 @@ tabs = st.tabs([
     "🚀 Campaign Analysis",
     "✨ Advanced Insights"
 ])
-
-# --- Tab 0: Overview --------------------------------------------------------
 
 with tabs[0]:
     st.title("Marketing Survey & Campaign Dashboard")
@@ -150,27 +104,20 @@ with tabs[0]:
     c2.metric("Avg Monthly Spend", f"${avg_spend:,.2f}")
     c3.metric("ROI Proxy", f"${roi_proxy:,.2f}")
 
-# --- Tab 1: Descriptive -----------------------------------------------------
-
 with tabs[1]:
     st.header("🔍 Descriptive Analytics")
-
     st.subheader("Survey: Summary Statistics")
     desc = survey_f.select_dtypes(include="number").describe().T
     desc["IQR"] = desc["75%"] - desc["25%"]
     desc["LB"]  = desc["25%"] - 1.5 * desc["IQR"]
     desc["UB"]  = desc["75%"] + 1.5 * desc["IQR"]
-    st.dataframe(
-        desc.style.format({
-            "mean": "{:.2f}",
-            "std": "{:.2f}",
-            "IQR": "{:.2f}",
-            "LB": "{:.2f}",
-            "UB": "{:.2f}"
-        }),
-        use_container_width=True
-    )
-
+    st.dataframe(desc.style.format({
+        "mean": "{:.2f}",
+        "std": "{:.2f}",
+        "IQR": "{:.2f}",
+        "LB": "{:.2f}",
+        "UB": "{:.2f}"
+    }), use_container_width=True)
     if camp_f is not None:
         st.subheader("Campaign: Summary Statistics")
         num_cols = [
@@ -181,56 +128,27 @@ with tabs[1]:
         desc2["IQR"] = desc2["75%"] - desc2["25%"]
         desc2["LB"]  = desc2["25%"] - 1.5 * desc2["IQR"]
         desc2["UB"]  = desc2["75%"] + 1.5 * desc2["IQR"]
-        st.dataframe(
-            desc2.style.format({
-                "mean": "{:.2f}",
-                "std": "{:.2f}",
-                "IQR": "{:.2f}",
-                "LB": "{:.2f}",
-                "UB": "{:.2f}"
-            }),
-            use_container_width=True
-        )
-
-# --- Tab 2: Segmentation ---------------------------------------------------
+        st.dataframe(desc2.style.format({
+            "mean": "{:.2f}",
+            "std": "{:.2f}",
+            "IQR": "{:.2f}",
+            "LB": "{:.2f}",
+            "UB": "{:.2f}"
+        }), use_container_width=True)
 
 with tabs[2]:
     st.header("🔖 Segmentation Performance")
-    seg_dim = st.selectbox(
-        "Segment by",
-        ["Age_Group", "Gender", "Region", "Education"]
-    )
-    conv_seg = survey_f.groupby(seg_dim)["Purchase_Last_3mo"] \
-        .apply(lambda x: (x == "Yes").mean()) \
-        .reset_index(name="Conversion Rate")
-    fig = px.bar(
-        conv_seg,
-        x=seg_dim,
-        y="Conversion Rate",
-        text=conv_seg["Conversion Rate"].map("{:.1%}".format),
-        labels={"Conversion Rate": "Conv. Rate"}
-    )
+    seg_dim = st.selectbox("Segment by", ["Age_Group", "Gender", "Region", "Education"])
+    conv_seg = survey_f.groupby(seg_dim)["Purchase_Last_3mo"].apply(lambda x: (x == "Yes").mean()).reset_index(name="Conversion Rate")
+    fig = px.bar(conv_seg, x=seg_dim, y="Conversion Rate", text=conv_seg["Conversion Rate"].map("{:.1%}".format), labels={"Conversion Rate": "Conv. Rate"})
     st.plotly_chart(fig, use_container_width=True)
-
     st.subheader("ROI Proxy by Segment")
-    roi_seg = survey_f.groupby(seg_dim) \
-        .apply(lambda x: ((x["Purchase_Last_3mo"] == "Yes").mean() * rev_input
-                          - x["Monthly_Online_Spend"].mean())
-        ).reset_index(name="ROI")
-    fig2 = px.bar(
-        roi_seg,
-        x=seg_dim,
-        y="ROI",
-        text=roi_seg["ROI"].map("${:,.2f}".format)
-    )
+    roi_seg = survey_f.groupby(seg_dim).apply(lambda x: ((x["Purchase_Last_3mo"] == "Yes").mean() * rev_input - x["Monthly_Online_Spend"].mean())).reset_index(name="ROI")
+    fig2 = px.bar(roi_seg, x=seg_dim, y="ROI", text=roi_seg["ROI"].map("${:,.2f}".format))
     st.plotly_chart(fig2, use_container_width=True)
-
-# --- Tab 3: Models ---------------------------------------------------------
 
 with tabs[3]:
     st.header("🎯 Predictive Models")
-
-    # Classification
     df_clf = survey_f.copy()
     df_clf["Purchase_Last_3mo"] = df_clf["Purchase_Last_3mo"].map({"Yes": 1, "No": 0})
     le = LabelEncoder()
@@ -255,7 +173,7 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
-    # Regression
+    # Regression (THE CORRECT, ERROR-FREE RMSE CALCULATION)
     st.subheader("Linear Regression (Spend)")
     Xl = pd.get_dummies(
         survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
@@ -266,17 +184,13 @@ with tabs[3]:
     df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
     Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
     yl_clean = df_reg["Monthly_Online_Spend"]
-    Xltr, Xlte, yltr, ylte = train_test_split(
-        Xl_clean, yl_clean, test_size=0.3, random_state=42
-    )
+    Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
     lr = LinearRegression().fit(Xltr, yltr)
     ylpred = lr.predict(Xlte)
-    # FIXED: Compute RMSE MANUALLY
     mse = mean_squared_error(ylte, ylpred)
     rmse = np.sqrt(mse)
     st.metric("RMSE", f"{rmse:.2f}")
 
-    # Clustering
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
@@ -284,12 +198,7 @@ with tabs[3]:
     k = st.slider("Number of Clusters", 2, 8, 4)
     km = KMeans(n_clusters=k, random_state=42).fit(Xs)
     pca = PCA(n_components=2).fit_transform(Xs)
-    fig3 = px.scatter(
-        x=pca[:, 0],
-        y=pca[:, 1],
-        color=km.labels_.astype(str),
-        labels={"x": "PC1", "y": "PC2", "color": "Cluster"}
-    )
+    fig3 = px.scatter(x=pca[:, 0], y=pca[:, 1], color=km.labels_.astype(str), labels={"x": "PC1", "y": "PC2", "color": "Cluster"})
     st.plotly_chart(fig3, use_container_width=True)
     survey_f["Cluster"] = km.labels_
     prof = survey_f.groupby("Cluster").agg({
@@ -300,8 +209,6 @@ with tabs[3]:
         "Monthly_Online_Spend": "Avg_Spend"
     })
     st.write(prof)
-
-# --- Tab 4: Campaign Analysis -----------------------------------------------
 
 with tabs[4]:
     st.header("🚀 Campaign Analysis")
@@ -365,8 +272,6 @@ with tabs[4]:
         ts = camp_f.groupby("Date")["Conversion_Rate"].mean().reset_index()
         fig9 = px.line(ts, x="Date", y="Conversion_Rate")
         st.plotly_chart(fig9, use_container_width=True)
-
-# --- Tab 5: Advanced Insights -----------------------------------------------
 
 with tabs[5]:
     st.header("✨ Advanced Insights")
