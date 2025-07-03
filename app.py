@@ -288,10 +288,8 @@ with tabs[3]:
     )
     lr = LinearRegression().fit(Xltr, yltr)
     ylpred = lr.predict(Xlte)
-    st.metric(
-        "RMSE",
-        f"{mean_squared_error(ylte, ylpred, squared=False):.2f}"
-    )
+    rmse = np.sqrt(mean_squared_error(ylte, ylpred))
+    st.metric("RMSE", f"{rmse:.2f}")
 
     # K-Means Clustering
     st.subheader("K-Means Clustering")
