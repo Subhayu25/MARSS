@@ -191,6 +191,7 @@ with tabs[3]:
     rmse = np.sqrt(mse)
     st.metric("RMSE", f"{rmse:.2f}")
 
+    # ---- KMeans with robust Cluster labeling ----
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
@@ -200,8 +201,11 @@ with tabs[3]:
     pca = PCA(n_components=2).fit_transform(Xs)
     fig3 = px.scatter(x=pca[:, 0], y=pca[:, 1], color=km.labels_.astype(str), labels={"x": "PC1", "y": "PC2", "color": "Cluster"})
     st.plotly_chart(fig3, use_container_width=True)
-    survey_f["Cluster"] = km.labels_
-    prof = survey_f.groupby("Cluster").agg({
+
+    # Assign clusters to matching rows ONLY (no length mismatch)
+    clust_df = survey_f.loc[X.index].copy()
+    clust_df["Cluster"] = km.labels_
+    prof = clust_df.groupby("Cluster").agg({
         "Purchase_Last_3mo": lambda x: (x == "Yes").mean(),
         "Monthly_Online_Spend": "mean"
     }).rename(columns={
