@@ -277,14 +277,14 @@ with tabs[3]:
     )
     yl = survey_f["Monthly_Online_Spend"]
 
-    # Clean infinite / NaN for regression
-    Xl = Xl.replace([np.inf, -np.inf], np.nan)
-    maskl = Xl.notnull().all(axis=1)
-    Xl = Xl.loc[maskl]
-    yl = yl.loc[maskl]
+    # Combine and clean for regression
+    df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
+    df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
+    Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
+    yl_clean = df_reg["Monthly_Online_Spend"]
 
     Xltr, Xlte, yltr, ylte = train_test_split(
-        Xl, yl, test_size=0.3, random_state=42
+        Xl_clean, yl_clean, test_size=0.3, random_state=42
     )
     lr = LinearRegression().fit(Xltr, yltr)
     ylpred = lr.predict(Xlte)
