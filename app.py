@@ -17,7 +17,6 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# Sidebar: Uploads & Filters
 st.sidebar.title("🔧 Uploads & Filters")
 
 uploaded_csv = st.sidebar.file_uploader(
@@ -56,29 +55,36 @@ if survey_df.empty:
     st.warning("No data loaded. Please upload a CSV or ensure the default dataset is available.")
     st.stop()
 
-# Show available columns in the sidebar
 st.sidebar.write("**Available columns in dataset:**")
 st.sidebar.write(list(survey_df.columns))
 
-# Filters (check columns first)
-if "Age" in survey_df.columns and "Gender" in survey_df.columns:
-    st.sidebar.header("Survey Filters")
+# --- Multi-filter: for all categorical columns ---
+cat_cols = survey_df.select_dtypes(include=['object', 'category']).columns.tolist()
+num_cols = survey_df.select_dtypes(include=[np.number]).columns.tolist()
+filters = {}
+if cat_cols:
+    st.sidebar.markdown("**Advanced Filters:**")
+    for col in cat_cols:
+        if survey_df[col].nunique() <= 25: # Only show filters for columns with not too many unique values
+            opts = st.sidebar.multiselect(
+                f"Filter by {col}", 
+                options=survey_df[col].unique(), 
+                default=list(survey_df[col].unique())
+            )
+            filters[col] = opts
+# Numeric range sliders
+if "Age" in survey_df.columns:
     age_min, age_max = int(survey_df['Age'].min()), int(survey_df['Age'].max())
     age_filter = st.sidebar.slider("Age Range", min_value=age_min, max_value=age_max, value=(age_min, age_max))
-    gender_filter = st.sidebar.multiselect(
-        "Select Gender",
-        options=survey_df["Gender"].unique(),
-        default=list(survey_df["Gender"].unique())
-    )
-    filtered_df = survey_df[
-        (survey_df["Age"] >= age_filter[0]) &
-        (survey_df["Age"] <= age_filter[1]) &
-        (survey_df["Gender"].isin(gender_filter))
-    ]
 else:
-    if "Age" not in survey_df.columns or "Gender" not in survey_df.columns:
-        st.sidebar.warning("No 'Age' and/or 'Gender' column(s) for filtering. All rows shown.")
-    filtered_df = survey_df.copy()
+    age_filter = None
+
+filtered_df = survey_df.copy()
+for col, vals in filters.items():
+    if col in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df[col].isin(vals)]
+if age_filter:
+    filtered_df = filtered_df[(filtered_df["Age"] >= age_filter[0]) & (filtered_df["Age"] <= age_filter[1])]
 
 # Prepare numeric purchase column for later use
 if "Purchase_Last_3mo" in filtered_df.columns:
@@ -87,20 +93,20 @@ if "Purchase_Last_3mo" in filtered_df.columns:
         mapping = {'yes': 1, 'no': 0, 'Yes': 1, 'No': 0, 'Y': 1, 'N': 0}
         filtered_df['Purchase_Last_3mo_numeric'] = filtered_df['Purchase_Last_3mo'].map(mapping)
 
-# Define tabs
+# ---- TABS ----
 tab_titles = [
     "Dashboard",
     "Demographics",
     "Satisfaction",
+    "Correlation & Outliers",
     "Channel Analysis",
     "Segmentation",
-    "Regression",
+    "ML Predictions",
     "Campaign Data",
     "Raw Data"
 ]
 tabs = st.tabs(tab_titles)
 
-# Tab 0: Dashboard (Key Insights)
 with tabs[0]:
     st.markdown("## 📈 Dashboard: Key Insights")
     col1, col2, col3 = st.columns(3)
@@ -121,32 +127,26 @@ with tabs[0]:
         else:
             st.metric("Purchase Rate (Last 3mo)", "N/A")
 
-# Tab 1: Demographics
 with tabs[1]:
     st.markdown("### Demographic Breakdown")
-    if "Gender" in filtered_df.columns:
+    if "Gender" in filtered_df.columns or "Age" in filtered_df.columns:
         col1, col2 = st.columns(2)
-        with col1:
-            fig1, ax1 = plt.subplots()
-            gender_counts = filtered_df["Gender"].value_counts()
-            ax1.pie(gender_counts, labels=gender_counts.index, autopct='%1.1f%%', startangle=90)
-            ax1.set_title("Gender Distribution")
-            st.pyplot(fig1)
+        if "Gender" in filtered_df.columns:
+            with col1:
+                fig1, ax1 = plt.subplots()
+                gender_counts = filtered_df["Gender"].value_counts()
+                ax1.pie(gender_counts, labels=gender_counts.index, autopct='%1.1f%%', startangle=90)
+                ax1.set_title("Gender Distribution")
+                st.pyplot(fig1)
         if "Age" in filtered_df.columns:
             with col2:
                 fig2, ax2 = plt.subplots()
                 sns.histplot(filtered_df["Age"], kde=True, bins=20, ax=ax2)
                 ax2.set_title("Age Distribution")
                 st.pyplot(fig2)
-    elif "Age" in filtered_df.columns:
-        fig2, ax2 = plt.subplots()
-        sns.histplot(filtered_df["Age"], kde=True, bins=20, ax=ax2)
-        ax2.set_title("Age Distribution")
-        st.pyplot(fig2)
     else:
         st.info("No 'Age' or 'Gender' columns for demographic breakdown.")
 
-# Tab 2: Satisfaction
 with tabs[2]:
     st.markdown("### Satisfaction Score Distribution")
     if "Satisfaction_Score" in filtered_df.columns:
@@ -157,8 +157,36 @@ with tabs[2]:
     else:
         st.info("No 'Satisfaction_Score' column for satisfaction distribution.")
 
-# Tab 3: Channel Analysis
 with tabs[3]:
+    st.markdown("### Correlation & Outliers")
+    if len(num_cols) >= 2:
+        st.subheader("Correlation Heatmap")
+        corr = filtered_df[num_cols].corr()
+        figc, axc = plt.subplots(figsize=(8,5))
+        sns.heatmap(corr, annot=True, cmap='coolwarm', ax=axc)
+        st.pyplot(figc)
+        st.subheader("Pairplot (sampled for speed)")
+        sample_size = min(200, len(filtered_df))
+        sns.pairplot(filtered_df[num_cols].sample(sample_size))
+        st.pyplot(plt.gcf())
+        st.subheader("Outlier Detection")
+        # Example: IQR-based for numeric columns
+        outlier_cols = []
+        for col in num_cols:
+            q1 = filtered_df[col].quantile(0.25)
+            q3 = filtered_df[col].quantile(0.75)
+            iqr = q3 - q1
+            outliers = filtered_df[(filtered_df[col] < q1 - 1.5 * iqr) | (filtered_df[col] > q3 + 1.5 * iqr)]
+            if not outliers.empty:
+                outlier_cols.append(col)
+        if outlier_cols:
+            st.write("Columns with outliers detected:", outlier_cols)
+        else:
+            st.write("No strong outliers detected.")
+    else:
+        st.info("Not enough numeric columns for correlation/outlier analysis.")
+
+with tabs[4]:
     st.markdown("### Purchase by Acquisition Channel")
     if 'Acquisition_Channel' in filtered_df.columns and 'Purchase_Last_3mo_numeric' in filtered_df.columns:
         channel_purchase = filtered_df.groupby("Acquisition_Channel")["Purchase_Last_3mo_numeric"].mean().reset_index()
@@ -167,13 +195,11 @@ with tabs[3]:
     else:
         st.info("No suitable columns for channel analysis.")
 
-# Tab 4: Segmentation (KMeans)
-with tabs[4]:
+with tabs[5]:
     st.markdown("### Customer Segmentation (KMeans)")
-    numeric_cols = filtered_df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(numeric_cols) >= 3:
+    if len(num_cols) >= 3:
         kmeans = KMeans(n_clusters=3, random_state=42)
-        cluster_data = filtered_df[numeric_cols].fillna(0)
+        cluster_data = filtered_df[num_cols].fillna(0)
         clusters = kmeans.fit_predict(cluster_data)
         pca = PCA(n_components=2)
         cluster_2d = pca.fit_transform(cluster_data)
@@ -185,52 +211,46 @@ with tabs[4]:
     else:
         st.info("Not enough numeric columns for KMeans clustering.")
 
-# Tab 5: Regression Modeling
-with tabs[5]:
-    st.header("🔬 Regression Modeling (Lasso, Ridge, Decision Tree)")
-    if len(numeric_cols) >= 2:
-        reg_candidates = [col for col in numeric_cols if filtered_df[col].nunique() > 5]
+with tabs[6]:
+    st.header("🤖 ML Predictions (Lasso, Ridge, Decision Tree)")
+    if len(num_cols) >= 2:
+        reg_candidates = [col for col in num_cols if filtered_df[col].nunique() > 5]
         if reg_candidates:
             reg_target = st.selectbox(
                 "Select target variable for regression",
                 options=reg_candidates,
                 help="Target variable should be continuous/numeric."
             )
-            reg_features = [col for col in numeric_cols if col != reg_target]
+            reg_features = [col for col in num_cols if col != reg_target]
+            model_choice = st.radio("Choose regression model", ["Lasso", "Ridge", "Decision Tree"])
             if reg_target and reg_features:
                 X = filtered_df[reg_features].fillna(0)
                 y = filtered_df[reg_target].fillna(0)
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
-                results = {}
-                models = {
-                    "Lasso Regression": Lasso(),
-                    "Ridge Regression": Ridge(),
-                    "Decision Tree Regression": DecisionTreeRegressor(random_state=42)
-                }
-                for name, model in models.items():
-                    model.fit(X_train, y_train)
-                    preds = model.predict(X_test)
-                    results[name] = {
-                        "r2": r2_score(y_test, preds),
-                        "rmse": np.sqrt(mean_squared_error(y_test, preds)),
-                        "y_test": y_test,
-                        "preds": preds
-                    }
-                res_df = pd.DataFrame({
-                    "Model": list(results.keys()),
-                    "R² Score": [results[m]["r2"] for m in results],
-                    "RMSE": [results[m]["rmse"] for m in results]
-                })
-                st.dataframe(res_df)
-                for name in models.keys():
-                    st.subheader(f"{name}: Actual vs. Predicted")
-                    fig, ax = plt.subplots()
-                    ax.scatter(results[name]["y_test"], results[name]["preds"], alpha=0.6)
-                    ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
-                    ax.set_xlabel("Actual")
-                    ax.set_ylabel("Predicted")
-                    ax.set_title(f"{name} - {reg_target}")
-                    st.pyplot(fig)
+                if model_choice == "Lasso":
+                    model = Lasso()
+                elif model_choice == "Ridge":
+                    model = Ridge()
+                else:
+                    model = DecisionTreeRegressor(random_state=42)
+                model.fit(X_train, y_train)
+                preds = model.predict(X_test)
+                r2 = r2_score(y_test, preds)
+                rmse = np.sqrt(mean_squared_error(y_test, preds))
+                st.markdown(f"**R² Score:** {r2:.3f}")
+                st.markdown(f"**RMSE:** {rmse:.3f}")
+                fig, ax = plt.subplots()
+                ax.scatter(y_test, preds, alpha=0.6)
+                ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
+                ax.set_xlabel("Actual")
+                ax.set_ylabel("Predicted")
+                ax.set_title(f"{model_choice} Regression: Actual vs. Predicted ({reg_target})")
+                st.pyplot(fig)
+                # Show feature importances if Decision Tree
+                if model_choice == "Decision Tree":
+                    st.subheader("Feature Importances")
+                    importances = pd.Series(model.feature_importances_, index=reg_features)
+                    st.bar_chart(importances.sort_values(ascending=False))
             else:
                 st.info("Not enough numeric features for regression modeling.")
         else:
@@ -238,8 +258,7 @@ with tabs[5]:
     else:
         st.info("Not enough numeric columns for regression modeling.")
 
-# Tab 6: Campaign Data (Excel)
-with tabs[6]:
+with tabs[7]:
     st.markdown("## 📊 Marketing Campaign Data")
     if uploaded_excel is not None:
         try:
@@ -253,10 +272,9 @@ with tabs[6]:
     else:
         st.info("Upload an Excel file to see campaign data.")
 
-# Tab 7: Raw Data
-with tabs[7]:
+with tabs[8]:
     st.markdown("## Raw Data Table")
     st.dataframe(filtered_df)
 
 st.markdown("---")
-st.info("Enhance this dashboard with more filters, charts, and ML predictions as needed!")
+st.info("You can enhance this dashboard further with more filters, charts, and ML predictions as needed. 🚀")
