@@ -96,7 +96,21 @@ with col2:
     else:
         st.metric("Avg Satisfaction", "N/A")
 with col3:
-    st.metric("Purchase Rate (Last 3mo)", f"{filtered_df['Purchase_Last_3mo'].mean()*100:.1f}%")
+    # Robust purchase rate calculation: handles numeric and string cases
+    if "Purchase_Last_3mo" in filtered_df.columns:
+        # Try convert to numeric
+        filtered_df['Purchase_Last_3mo_numeric'] = pd.to_numeric(filtered_df['Purchase_Last_3mo'], errors='coerce')
+        # If all are NaN, try map common string values
+        if filtered_df['Purchase_Last_3mo_numeric'].isna().all():
+            mapping = {'yes': 1, 'no': 0, 'Yes': 1, 'No': 0, 'Y': 1, 'N': 0}
+            filtered_df['Purchase_Last_3mo_numeric'] = filtered_df['Purchase_Last_3mo'].map(mapping)
+        purchase_rate = filtered_df['Purchase_Last_3mo_numeric'].mean()
+        if purchase_rate is not None and not np.isnan(purchase_rate):
+            st.metric("Purchase Rate (Last 3mo)", f"{purchase_rate*100:.1f}%")
+        else:
+            st.metric("Purchase Rate (Last 3mo)", "N/A")
+    else:
+        st.metric("Purchase Rate (Last 3mo)", "N/A")
 
 # Basic Visualizations
 if "Gender" in filtered_df.columns:
@@ -127,8 +141,8 @@ if "Satisfaction_Score" in filtered_df.columns:
 # Purchase behavior by channel (if 'Acquisition_Channel' exists)
 if 'Acquisition_Channel' in filtered_df.columns:
     st.markdown("### Purchase by Acquisition Channel")
-    channel_purchase = filtered_df.groupby("Acquisition_Channel")["Purchase_Last_3mo"].mean().reset_index()
-    fig4 = px.bar(channel_purchase, x="Acquisition_Channel", y="Purchase_Last_3mo", labels={"Purchase_Last_3mo": "Purchase Rate"})
+    channel_purchase = filtered_df.groupby("Acquisition_Channel")["Purchase_Last_3mo_numeric"].mean().reset_index()
+    fig4 = px.bar(channel_purchase, x="Acquisition_Channel", y="Purchase_Last_3mo_numeric", labels={"Purchase_Last_3mo_numeric": "Purchase Rate"})
     st.plotly_chart(fig4, use_container_width=True)
 
 # Example: Cluster Analysis (if enough features are present)
