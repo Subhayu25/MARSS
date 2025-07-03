@@ -186,10 +186,10 @@ with tabs[3]:
     yl_clean = df_reg["Monthly_Online_Spend"]
     Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
     lr = LinearRegression().fit(Xltr, yltr)
-    ylpred = lr.predict(Xlte)
-    mse = mean_squared_error(ylte, ylpred)
-    rmse = np.sqrt(mse)
-    st.metric("RMSE", f"{rmse:.2f}")
+ylpred = lr.predict(Xlte)
+mse = mean_squared_error(ylte, ylpred)
+rmse = np.sqrt(mse)
+st.metric("RMSE", f"{rmse:.2f}")
 
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
