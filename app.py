@@ -149,6 +149,8 @@ with tabs[2]:
 
 with tabs[3]:
     st.header("🎯 Predictive Models")
+
+    # --- Classification ---
     df_clf = survey_f.copy()
     df_clf["Purchase_Last_3mo"] = df_clf["Purchase_Last_3mo"].map({"Yes": 1, "No": 0})
     le = LabelEncoder()
@@ -173,36 +175,25 @@ with tabs[3]:
     st.subheader("Logistic Regression")
     st.json(clf_metrics)
 
-        # Linear Regression (Spend)
+    # --- Regression ---
     st.subheader("Linear Regression (Spend)")
-
-    # Prepare features
     Xl = pd.get_dummies(
         survey_f.drop(columns=["Monthly_Online_Spend", "Purchase_Last_3mo"]),
         drop_first=True
     )
     yl = survey_f["Monthly_Online_Spend"]
-
-    # Combine features and target, remove any rows with NaN/infinite values
     df_reg = pd.concat([Xl, yl.rename("Monthly_Online_Spend")], axis=1)
     df_reg = df_reg.replace([np.inf, -np.inf], np.nan).dropna()
     Xl_clean = df_reg.drop(columns=["Monthly_Online_Spend"])
     yl_clean = df_reg["Monthly_Online_Spend"]
-
-    # Split train/test
-    Xltr, Xlte, yltr, ylte = train_test_split(
-        Xl_clean, yl_clean, test_size=0.3, random_state=42
-    )
-
-    # Fit linear regression
+    Xltr, Xlte, yltr, ylte = train_test_split(Xl_clean, yl_clean, test_size=0.3, random_state=42)
     lr = LinearRegression().fit(Xltr, yltr)
     ylpred = lr.predict(Xlte)
-
-    # Calculate RMSE the correct way (no squared argument!)
     mse = mean_squared_error(ylte, ylpred)
     rmse = np.sqrt(mse)
     st.metric("RMSE", f"{rmse:.2f}")
 
+    # --- Clustering ---
     st.subheader("K-Means Clustering")
     num_features = X.select_dtypes(include="number")
     scaler = StandardScaler().fit(num_features)
